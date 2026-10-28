@@ -4,6 +4,9 @@ header('Content-Type: application/json; charset=UTF-8');
 
 $rawInput = file_get_contents('php://input');
 $data = json_decode($rawInput, true);
+if (!is_array($data)) {
+    $data = $_POST;
+}
 
 $phone    = trim($data['phone'] ?? '');
 $password = trim($data['password'] ?? '');
@@ -22,8 +25,20 @@ try {
     $stmt->execute([$phone]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    // 2. So khớp mật khẩu đã băm (hash)
-    if ($user && password_verify($password, $user['password'])) {
+    // 2. So khớp mật khẩu đã băm (hash) hoặc plain text fallback
+    $isMatch = false;
+    if ($user) {
+        if (password_verify($password, $user['password'])) {
+            $isMatch = true;
+        } elseif ($password === $user['password']) {
+            $isMatch = true;
+            // Tự động nâng cấp hash bcrypt
+            $newHash = password_hash($password, PASSWORD_BCRYPT);
+            $conn->prepare("UPDATE users SET password = ? WHERE id = ?")->execute([$newHash, $user['id']]);
+        }
+    }
+
+    if ($isMatch) {
         // Đăng nhập thành công, loại bỏ mật khẩu trước khi trả về app
         unset($user['password']);
         echo json_encode([

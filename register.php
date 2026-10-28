@@ -4,6 +4,9 @@ header('Content-Type: application/json; charset=UTF-8');
 
 $rawInput = file_get_contents('php://input');
 $data = json_decode($rawInput, true);
+if (!is_array($data)) {
+    $data = $_POST;
+}
 
 $name     = trim($data['name'] ?? '');
 $phone    = trim($data['phone'] ?? '');
@@ -36,10 +39,17 @@ try {
     // 3. Lưu tài khoản mới vào database
     $stmt = $conn->prepare("INSERT INTO users (name, phone, password, address) VALUES (?, ?, ?, ?)");
     $stmt->execute([$name, $phone, $hashedPassword, $address]);
+    $newId = $conn->lastInsertId();
 
     echo json_encode([
         'status' => 'success',
-        'message' => 'Đăng ký tài khoản thành công! Bạn có thể đăng nhập ngay.'
+        'message' => 'Đăng ký tài khoản thành công! Bạn có thể đăng nhập ngay.',
+        'user' => [
+            'id' => (int)$newId,
+            'name' => $name,
+            'phone' => $phone,
+            'address' => $address
+        ]
     ]);
 } catch (Exception $e) {
     echo json_encode([
